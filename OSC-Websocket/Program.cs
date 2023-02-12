@@ -21,7 +21,7 @@ namespace ConsoleApp
             Console.WriteLine("WebSocket server started on ws://localhost:8080/osc");
 
             // Start an OSC over TCP client to send data to the TX line port 8001
-            oscTcpClient = new TcpClient("127.0.0.1", 8001);
+            oscTcpClient = new TcpClient("127.0.0.1", 8001); //this shit refuses connection like a lottery need to figure this out
             Console.WriteLine("OSC over TCP client started on TCP 127.0.0.1:8001");
 
             // Start an OSC over TCP server
