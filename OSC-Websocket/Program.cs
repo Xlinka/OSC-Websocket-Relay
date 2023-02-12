@@ -11,6 +11,7 @@ namespace ConsoleApp
     class Program
     {
         static WebSocketServer wssv;
+        static TcpClient oscTcpClient;
         static void Main(string[] args)
         {
             // Start a WebSocket server
@@ -19,11 +20,14 @@ namespace ConsoleApp
             wssv.Start();
             Console.WriteLine("WebSocket server started on ws://localhost:8080/osc");
 
+            // Start an OSC over TCP client to send data to the TX line port 8001
+            oscTcpClient = new TcpClient("127.0.0.1", 8001);
+            Console.WriteLine("OSC over TCP client started on TCP 127.0.0.1:8001");
+
             // Start an OSC over TCP server
             var oscTcpListener = new TcpListener(IPAddress.Any, 8000);
             oscTcpListener.Start();
             Console.WriteLine("OSC over TCP listener started on TCP 0.0.0.0:8000");
-            var oscTcpClient = new TcpClient();
 
             // Start listening for incoming connections
             var listenerTask = new Task(() =>
@@ -77,7 +81,6 @@ namespace ConsoleApp
             {
                 return null;
             }
-
             // Read the OSC type tag string
             var typeTag = ReadOscString(stream);
             if (typeTag == null)
@@ -144,81 +147,13 @@ namespace ConsoleApp
         {
             var lengthBytes = new byte[4];
             stream.Read(lengthBytes, 0, 4);
-
-            int length = BitConverter.ToInt32(lengthBytes, 0);
-            var stringBytes = new byte[length];
-            stream.Read(stringBytes, 0, length);
-
-            return Encoding.UTF8.GetString(stringBytes);
-        }
-        private static void ProcessOscPacket(NetworkStream stream)
-        {
-            // Read the OSC address pattern
-            var address = ReadOscString(stream);
-
-            // Read the OSC type tag string
-            var typeTag = ReadOscString(stream);
-
-            // Read the OSC arguments
-            var arguments = new List<object>();
-            for (int i = 1; i < typeTag.Length; i++)
-            {
-                switch (typeTag[i])
-                {
-                    case 'i':
-                        var intBytes = new byte[4];
-                        stream.Read(intBytes, 0, 4);
-                        arguments.Add(BitConverter.ToInt32(intBytes, 0));
-                        break;
-                    case 'f':
-                        var floatBytes = new byte[4];
-                        stream.Read(floatBytes, 0, 4);
-                        arguments.Add(BitConverter.ToSingle(floatBytes, 0));
-                        break;
-                    case 's':
-                        arguments.Add(ReadOscString(stream));
-                        break;
-                }
-            }
-
-            // Do something with the OSC packet
-            Console.WriteLine("Received OSC packet: " + address + " " + string.Join(" ", arguments));
-        }
-        private static void ListenForOscPackets()
-        {
-            TcpListener listener = new TcpListener(IPAddress.Any, 8000);
-            listener.Start();
-            Console.WriteLine("Listening for OSC packets on TCP port 8000");
-
-            while (true)
-            {
-                var client = listener.AcceptTcpClient();
-                Console.WriteLine("Accepted connection from " + client.Client.RemoteEndPoint);
-
-                var stream = client.GetStream();
-                ProcessOscPacket(stream);
-
-                client.Close();
-            }
+            var length = BitConverter.ToInt32(lengthBytes, 0);
+            var bytes = new byte[length];
+            stream.Read(bytes, 0, length);
+            return Encoding.UTF8.GetString(bytes);
         }
     }
 }
 
-class OSCWebSocketBehavior : WebSocketBehavior
-{
-    protected override void OnOpen()
-    {
-        Console.WriteLine("A WebSocket client connected.");
-    }
 
-    protected override void OnClose(CloseEventArgs e)
-    {
-        Console.WriteLine("A WebSocket client disconnected.");
-    }
 
-    protected override void OnMessage(MessageEventArgs e)
-    {
-        Console.WriteLine("A WebSocket client sent a message: " + e.Data);
-        Send(e.Data);
-    }
-}
